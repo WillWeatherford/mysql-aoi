@@ -2,6 +2,8 @@
 
 Utilizes mysql-connector-python package.
 """
+from __future__ import unicode_literals, print_function, division
+
 
 # Local config.py file holding settings.
 import config
