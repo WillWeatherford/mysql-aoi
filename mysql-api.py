@@ -8,6 +8,7 @@ from __future__ import unicode_literals, print_function, division
 # Local config.py file holding settings.
 import config
 from mysql import connector
+from operator import itemgetter
 
 
 def connect(**kwargs):
@@ -18,11 +19,26 @@ def connect(**kwargs):
         raise err
 
 
-def insert(*args, **kwargs):
+def insert(table_name, rows):
     """Insert data into the MySQL database.
 
     Return number of rows inserted if successful; return failure if error.
     """
+    conn = connect(**config.DEFAULT_CONFIG)
+    cursor = conn.cursor()
+    for row_dict in rows:
+        items = row_dict.items()
+        keys = map(itemgetter(0), items)
+        values = map(itemgetter(1), items)
+
+        method = 'INSERT into {}'.format(table_name)
+        columns = '({})'.format(', '.join(keys))
+        values = 'VALUES ({})'.format(', '.join(values))
+
+        query = ' '.join((method, columns, values))
+        cursor.execute(query)
+
+    return
 
 
 def query(*args, **kwargs):
