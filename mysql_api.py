@@ -42,19 +42,25 @@ def insert(table_name, rows=()):
     cursor = conn.cursor()
 
     # Probably need to do session or transaction instead
-    for row_dict in rows:
-        items = row_dict.items()
-        keys = map(itemgetter(0), items)
-        values = map(itemgetter(1), items)
+    success_count = 0
+    try:
+        for row_dict in rows:
+            items = row_dict.items()
+            keys = map(itemgetter(0), items)
+            values = map(itemgetter(1), items)
 
-        method = 'INSERT into {}'.format(table_name)
-        columns = '({})'.format(', '.join(keys))
-        values = 'VALUES ({})'.format(', '.join(values))
+            method = 'INSERT into {}'.format(table_name)
+            columns = '({})'.format(', '.join(keys))
+            values = 'VALUES ({})'.format(', '.join(values))
 
-        query_string = ' '.join((method, columns, values))
-        cursor.execute(query_string)
+            query_string = ' '.join((method, columns, values))
+            cursor.execute(query_string)
 
-    return
+            success_count += 1
+    except Exception as e:
+        return jsonify(error=''.join(e.args))
+
+    return jsonify(success=success_count)
 
 
 def connect(**kwargs):
@@ -65,11 +71,8 @@ def connect(**kwargs):
         raise err
 
 
-
-
 def select(table_name, columns='*', criteria=None):
     """Generate results from select call to MySQL database."""
-
     conn = connect(**config.DEFAULT_CONFIG)
     cursor = conn.cursor()
 
