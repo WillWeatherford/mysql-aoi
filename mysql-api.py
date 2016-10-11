@@ -35,14 +35,27 @@ def insert(table_name, rows):
         columns = '({})'.format(', '.join(keys))
         values = 'VALUES ({})'.format(', '.join(values))
 
-        query = ' '.join((method, columns, values))
-        cursor.execute(query)
+        query_string = ' '.join((method, columns, values))
+        cursor.execute(query_string)
 
     return
 
 
-def query(*args, **kwargs):
+def select(table_name, columns='*', **kwargs):
     """Generate results from select call to MySQL database."""
+    conn = connect(**config.DEFAULT_CONFIG)
+    cursor = conn.cursor()
+
+    method = 'SELECT {} from {}'.format(', '.join(columns), table_name)
+    filters = ' AND '.join(' = '.join(pair) for pair in kwargs.items())
+    where = 'WHERE {}'.format(filters)
+
+    query_string = ' '.join((method, where))
+    cursor.execute(query_string)
+
+    column_names = cursor.column_names
+    for row in cursor:
+        yield dict(zip(column_names, row))
 
 
 def update(*args, **kwargs):
