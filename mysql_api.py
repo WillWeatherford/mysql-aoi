@@ -7,48 +7,41 @@ from __future__ import unicode_literals, print_function, division
 
 # Local config.py file holding settings.
 import config
-from flask import Flask, jsonify
 from mysql import connector
 from operator import itemgetter
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
 
-@app.route('/api/<table_name>/<int:pk>')
+@app.route('/api/<table_name>', methods=['GET'])
+def select_list(table_name):
+    """Simple get request for a single item."""
+    results = select(table_name, **request.args)
+    return jsonify(results=list(results))
+
+
+@app.route('/api/<table_name>/<int:pk>', methods=['GET'])
 def select_by_id(table_name, pk):
     """Simple get request for a single item."""
     pk_name = 'entity_id' if table_name == 'company' else 'id'
 
-    results = select(table_name, criteria={pk_name: pk})
+    results = select(table_name, criteria={pk_name: pk}, **request.args)
     obj = next(results)
 
     return jsonify(**obj)
 
 
-@app.route('/api/<table_name>')
-def select_all(table_name):
-    """Simple get request for a single item."""
-    results = select(table_name)
-    return jsonify(results=list(results))
-
-
-def connect(**kwargs):
-    """Return a new connection to the MySQL database."""
-    try:
-        return connector.connect(**kwargs)
-    except connector.Error as err:
-        raise err
-
-
-def insert(table_name, rows):
-    """Insert data into the MySQL database.
+@app.route('/api/<table_name>/insert', methods=['POST'])
+def insert(table_name, rows=()):
+    """Insert new data into the MySQL database.
 
     Return number of rows inserted if successful; return failure if error.
     """
     conn = connect(**config.DEFAULT_CONFIG)
     cursor = conn.cursor()
 
-    # Probably need to do session instead
+    # Probably need to do session or transaction instead
     for row_dict in rows:
         items = row_dict.items()
         keys = map(itemgetter(0), items)
@@ -62,6 +55,16 @@ def insert(table_name, rows):
         cursor.execute(query_string)
 
     return
+
+
+def connect(**kwargs):
+    """Return a new connection to the MySQL database."""
+    try:
+        return connector.connect(**kwargs)
+    except connector.Error as err:
+        raise err
+
+
 
 
 def select(table_name, columns='*', criteria=None):
