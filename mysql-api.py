@@ -47,10 +47,12 @@ def select(table_name, columns='*', **kwargs):
     cursor = conn.cursor()
 
     method = 'SELECT {} from {}'.format(', '.join(columns), table_name)
-    filters = ' AND '.join(' = '.join(pair) for pair in kwargs.items())
-    where = 'WHERE {}'.format(filters)
-
-    query_string = ' '.join((method, where))
+    if kwargs:
+        filters = ' AND '.join(' = '.join(pair) for pair in kwargs.items())
+        where = 'WHERE {}'.format(filters)
+        query_string = ' '.join((method, where))
+    else:
+        query_string = method
     cursor.execute(query_string)
 
     column_names = cursor.column_names
