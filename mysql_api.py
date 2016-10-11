@@ -7,8 +7,22 @@ from __future__ import unicode_literals, print_function, division
 
 # Local config.py file holding settings.
 import config
+from flask import Flask, jsonify
 from mysql import connector
 from operator import itemgetter
+
+app = Flask(__name__)
+
+
+@app.route('/api/<table_name>/<int:pk>')
+def select_by_id(table_name, pk):
+    """Simple get request for a single item."""
+    pk_name = 'entity_id' if table_name == 'company' else 'id'
+
+    results = select(table_name, criteria={pk_name: pk})
+    obj = next(results)
+
+    return jsonify(**obj)
 
 
 def connect(**kwargs):
@@ -26,6 +40,8 @@ def insert(table_name, rows):
     """
     conn = connect(**config.DEFAULT_CONFIG)
     cursor = conn.cursor()
+
+    # Probably need to do session instead
     for row_dict in rows:
         items = row_dict.items()
         keys = map(itemgetter(0), items)
@@ -41,18 +57,19 @@ def insert(table_name, rows):
     return
 
 
-def select(table_name, columns='*', **kwargs):
+def select(table_name, columns='*', criteria=None):
     """Generate results from select call to MySQL database."""
+
     conn = connect(**config.DEFAULT_CONFIG)
     cursor = conn.cursor()
 
     method = 'SELECT {} from {}'.format(', '.join(columns), table_name)
-    if kwargs:
-        filters = ' AND '.join(' = '.join(pair) for pair in kwargs.items())
+    if not criteria:
+        query_string = method
+    else:
+        filters = ' AND '.join(' = '.join(pair) for pair in criteria.items())
         where = 'WHERE {}'.format(filters)
         query_string = ' '.join((method, where))
-    else:
-        query_string = method
     cursor.execute(query_string)
 
     column_names = cursor.column_names
