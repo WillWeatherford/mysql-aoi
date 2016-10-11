@@ -33,7 +33,7 @@ def select_by_id(table_name, pk):
 
 
 @app.route('/api/<table_name>/insert', methods=['POST'])
-def insert(table_name, rows=()):
+def insert(table_name):
     """Insert new data into the MySQL database.
 
     Return number of rows inserted if successful; return failure if error.
@@ -43,6 +43,7 @@ def insert(table_name, rows=()):
 
     # Probably need to do session or transaction instead
     success_count = 0
+    rows = request.args.get('rows', ())
     try:
         for row_dict in rows:
             items = row_dict.items()
@@ -90,11 +91,33 @@ def select(table_name, columns='*', criteria=None):
         yield dict(zip(column_names, row))
 
 
-def update(*args, **kwargs):
+@app.route('/api/<table_name>/update', methods=['PUT'])
+def update(table_name, **kwargs):
     """Update records in MySQL database.
 
     Return number of rows updated if successful; return failure if error.
     """
+    conn = connect(**config.DEFAULT_CONFIG)
+    cursor = conn.cursor()
+    pk_name = 'entity_id' if table_name == 'company' else 'id'
+    success_count = 0
+    rows = request.args.get('rows', ())
+    try:
+        for row_dict in rows:
+
+            method = 'UPDATE {}'.format(table_name)
+            items = ', '.join('='.join(pair) for pair in row_dict.items())
+            set_ = 'SET {}'.format(items)
+            where = 'WHERE {}={}'.format(pk_name, row_dict[pk_name])
+
+            query_string = ' '.join((method, set_, where))
+            cursor.execute(query_string)
+
+            success_count += 1
+    except Exception as e:
+        return jsonify(error=''.join(e.args))
+
+    return jsonify(success=success_count)
 
 
 def delete(*args, **kwargs):
