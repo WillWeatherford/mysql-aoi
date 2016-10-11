@@ -25,6 +25,13 @@ def select_by_id(table_name, pk):
     return jsonify(**obj)
 
 
+@app.route('/api/<table_name>')
+def select_all(table_name):
+    """Simple get request for a single item."""
+    results = select(table_name)
+    return jsonify(results=list(results))
+
+
 def connect(**kwargs):
     """Return a new connection to the MySQL database."""
     try:
