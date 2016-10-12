@@ -133,11 +133,35 @@ def update(table_name, **kwargs):
     return jsonify(success=success_count)
 
 
-def delete(*args, **kwargs):
+@app.route('/api/<table_name>/delete', methods=['DELETE'])
+def delete(table_name, **kwargs):
     """Delete records from MySQL database.
 
     Return number of rows deleted if successful; return failure if error.
     """
+    conn = connect(**config.DEFAULT_CONFIG)
+    cursor = conn.cursor()
+    rows = request.json['rows']
+
+    pk_name = 'entity_id' if table_name == 'company' else 'id'
+    success_count = 0
+    try:
+        for row_dict in rows:
+
+            method = "DELETE FROM {}".format(table_name)
+            where = "WHERE {}={}".format(pk_name, row_dict[pk_name])
+
+            query_string = " ".join((method, where))
+            cursor.execute(query_string)
+
+            success_count += 1
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        return jsonify(error=''.join(e.args))
+
+    return jsonify(success=success_count)
 
 
 def escape(query_string):
