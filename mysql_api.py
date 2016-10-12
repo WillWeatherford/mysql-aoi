@@ -108,21 +108,25 @@ def update(table_name, **kwargs):
     """
     conn = connect(**config.DEFAULT_CONFIG)
     cursor = conn.cursor()
+    rows = request.json['rows']
+
     pk_name = 'entity_id' if table_name == 'company' else 'id'
     success_count = 0
-    rows = request.args.get('rows', ())
     try:
         for row_dict in rows:
 
-            method = 'UPDATE {}'.format(table_name)
-            items = ', '.join('{}={}'.format(*pair) for pair in row_dict.items())
-            set_ = 'SET {}'.format(items)
-            where = 'WHERE {}={}'.format(pk_name, row_dict[pk_name])
+            method = "UPDATE {}".format(table_name)
+            items = ", ".join("{}='{}'".format(*pair) for pair in row_dict.items())
+            set_ = "SET {}".format(items)
+            where = "WHERE {}={}".format(pk_name, row_dict[pk_name])
 
-            query_string = ' '.join((method, set_, where))
+            query_string = " ".join((method, set_, where))
             cursor.execute(query_string)
 
             success_count += 1
+        conn.commit()
+        cursor.close()
+        conn.close()
     except Exception as e:
         return jsonify(error=''.join(e.args))
 
