@@ -17,7 +17,7 @@ app = Flask(__name__)
 @app.route('/api/<table_name>', methods=['GET'])
 def select_list(table_name):
     """Simple get request for a single item."""
-    results = select(table_name, **request.args)
+    results = select(table_name, **request.args.to_dict())
     return jsonify(results=list(results))
 
 
@@ -25,8 +25,10 @@ def select_list(table_name):
 def select_by_id(table_name, pk):
     """Simple get request for a single item."""
     pk_name = 'entity_id' if table_name == 'company' else 'id'
+    kwargs = request.args.to_dict()
+    kwargs[pk_name] = pk
+    results = select(table_name, **kwargs)
 
-    results = select(table_name, criteria={pk_name: pk}, **request.args)
     try:
         obj = next(results)
     except StopIteration:
@@ -43,23 +45,24 @@ def connect(**kwargs):
         raise err
 
 
-def select(table_name, columns='*', criteria=None):
+def select(table_name, columns='*', **kwargs):
     """Generate results from select call to MySQL database."""
     conn = connect(**config.DEFAULT_CONFIG)
     cursor = conn.cursor()
 
-    method = 'SELECT {} from {}'.format(', '.join(columns), table_name)
-    if not criteria:
+    method = "SELECT {} from {}".format(", ".join(columns), table_name)
+    if not kwargs:
         query_string = method
     else:
-        filters = ' AND '.join('{} = {}'.format(*pair) for pair in criteria.items())
-        where = 'WHERE {}'.format(filters)
-        query_string = ' '.join((method, where))
+        filters = " AND ".join("{}='{}'".format(*pair) for pair in kwargs.items())
+        where = "WHERE {}".format(filters)
+        query_string = " ".join((method, where))
     cursor.execute(query_string)
 
     column_names = cursor.column_names
     for row in cursor:
         yield dict(zip(column_names, row))
+    cursor.close()
 
 
 @app.route('/api/<table_name>/insert', methods=['POST'])
@@ -84,10 +87,13 @@ def insert(table_name):
             set_ = "SET {}".format(items)
 
             query_string = " ".join((method, set_))
-            # import pdb;pdb.set_trace()
             cursor.execute(query_string)
 
             success_count += 1
+        # import pdb;pdb.set_trace()
+        conn.commit()
+        cursor.close()
+        conn.close()
     except Exception as e:
         return jsonify(error=''.join(map(str, e.args)))
 
