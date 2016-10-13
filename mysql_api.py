@@ -29,17 +29,20 @@ def endpoint(table_name, pk=None):
     kwargs = request.args.to_dict()
 
     if pk is None:
-        rows = request.json.get('rows', [])
+        try:
+            rows = request.json.get('rows', ())
+        except AttributeError:
+            rows = ()
         return func(table_name, rows=rows, **kwargs)
 
     # Need to look up PK name from SQL instead
     pk_name = 'entity_id' if table_name == 'company' else 'id'
     kwargs[pk_name] = pk
-    rows = [kwargs]
+    rows = (kwargs, )
     return func(table_name, rows=rows, **kwargs)
 
 
-def get(table_name, columns='*', **kwargs):
+def get(table_name, columns='*', rows=(), **kwargs):
     """Generate results from select call to MySQL database."""
     conn = connect(**config.DEFAULT_CONFIG)
     cursor = conn.cursor()
