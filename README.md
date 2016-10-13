@@ -19,7 +19,7 @@ Each route is accessible with different HTTP methods for different purposes.
 
 - *GET* `/api/<table_name>/<int>`
   - Fetches record with primary key of the given int.
-  - Returns JSON data in format `{'rows': [obj1, obj2, ...]}`
+  - Returns JSON data in format `{'rows': [obj]}`
 
 - *POST* `/api/<table_name>`
   - Creates new records. Data must be included in POST request as json in the
