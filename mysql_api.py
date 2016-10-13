@@ -29,20 +29,14 @@ def endpoint(table_name, pk=None):
     kwargs = request.args.to_dict()
 
     if pk is None:
-        results = func(table_name, **kwargs)
-        return jsonify(results=list(results))
+        rows = request.json.get('rows', [])
+        return func(table_name, rows=rows, **kwargs)
 
-    # Need to look up PK name from SQL
+    # Need to look up PK name from SQL instead
     pk_name = 'entity_id' if table_name == 'company' else 'id'
     kwargs[pk_name] = pk
-    results = func(table_name, **kwargs)
-
-    try:
-        obj = next(results)
-    except StopIteration:
-        abort(404)
-    else:
-        return jsonify(**obj)
+    rows = [kwargs]
+    return func(table_name, rows=rows, **kwargs)
 
 
 def get(table_name, columns='*', **kwargs):
@@ -57,12 +51,14 @@ def get(table_name, columns='*', **kwargs):
         filters = " AND ".join("{}='{}'".format(*pair) for pair in kwargs.items())
         where = "WHERE {}".format(filters)
         query_string = " ".join((method, where))
-    cursor.execute(query_string)
+
+    try:
+        cursor.execute(query_string)
+    except Exception as e:
+        return jsonify(error=''.join(e.args))
 
     column_names = cursor.column_names
-    for row in cursor:
-        yield dict(zip(column_names, row))
-    cursor.close()
+    return jsonify(results=[dict(zip(column_names, row)) for row in cursor])
 
 
 def post(table_name, **kwargs):
@@ -96,11 +92,10 @@ def delete(table_name, **kwargs):
     return post_put_delete(method_str, pk_name=pk_name, **kwargs)
 
 
-def post_put_delete(method_str, pk_name=None, set_str=False, **kwargs):
+def post_put_delete(method_str, rows=(), pk_name=None, set_str=False, **kwargs):
     """Insert or update based on given specifications."""
     conn = connect(**config.DEFAULT_CONFIG)
     cursor = conn.cursor()
-    rows = request.json['rows']
 
     success_count = 0
     try:
