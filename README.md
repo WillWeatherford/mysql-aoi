@@ -2,11 +2,12 @@
 Simple Python API to interact with a MySQL database. Returns JSON data from
 HTTP requests.
 
-
-### Table names:
-- company
-- site_status
-- site_status_2
+### Setup:
+- create config.py file -- see example_config.py
+From command line:
+- pip install -r requirements.txt
+- export FLASK_APP = mysql_api.py
+- flask run
 
 ### Routes:
 Each route is accessible with different HTTP methods for different purposes.
