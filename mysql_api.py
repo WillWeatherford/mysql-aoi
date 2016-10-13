@@ -73,7 +73,7 @@ def get(table_name, columns="*", rows=(), **kwargs):
         return jsonify(error="".join(e.args))
 
     column_names = cursor.column_names
-    return jsonify(results=[dict(zip(column_names, row)) for row in cursor])
+    return jsonify(rows=[dict(zip(column_names, row)) for row in cursor])
 
 
 def post(table_name, **kwargs):
