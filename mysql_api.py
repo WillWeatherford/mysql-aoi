@@ -4,11 +4,17 @@ Utilizes mysql-connector-python package.
 """
 from __future__ import unicode_literals, print_function, division
 
+# mysql.connector.errors.IntegrityError: 1062 (23000):
+#   Duplicate entry '999999999' for key 'PRIMARY'
+
 
 # Local config.py file holding settings.
-from config import DEFAULT_CONFIG, COLS, VALID_TABLES
+import os
 from mysql import connector
 from flask import Flask, jsonify, request, abort
+from importlib import import_module
+
+config_module = import_module(os.environ['MYSQL_CONFIG_MODULE'])
 
 
 app = Flask(__name__)
@@ -26,7 +32,7 @@ def connect(**kwargs):
 @app.route("/api/<table_name>/<int:pk>", methods=["GET", "PUT", "DELETE"])
 def endpoint(table_name, pk=None):
     """Simple get request for a single item."""
-    if table_name not in VALID_TABLES:
+    if table_name not in config_module.VALID_TABLES:
         abort(404)
 
     func = globals()[request.method.lower()]
@@ -48,7 +54,7 @@ def endpoint(table_name, pk=None):
 
 def get(table_name, columns="*", rows=(), **kwargs):
     """Generate results from select call to MySQL database."""
-    conn = connect(**DEFAULT_CONFIG)
+    conn = connect(**config_module.CONNECT_PARAMS)
     cursor = conn.cursor()
 
     params = []
@@ -60,7 +66,7 @@ def get(table_name, columns="*", rows=(), **kwargs):
         pairs = []
         for key, val in kwargs.items():
             try:
-                pairs.append("{}=%s".format(COLS[key]))
+                pairs.append("{}=%s".format(config_module.COLS[key]))
             except KeyError:
                 return jsonify(error="Bad column name: {}".format(key))
             params.append(val)
@@ -109,7 +115,7 @@ def delete(table_name, **kwargs):
 
 def post_put_delete(method_str, rows=(), pk_name=None, set_str=False, **kwargs):
     """Insert or update based on given specifications."""
-    conn = connect(**DEFAULT_CONFIG)
+    conn = connect(**config_module.CONNECT_PARAMS)
     cursor = conn.cursor()
 
     params = []
@@ -122,7 +128,7 @@ def post_put_delete(method_str, rows=(), pk_name=None, set_str=False, **kwargs):
                 pairs = []
                 for key, val in row_dict.items():
                     try:
-                        pairs.append("{}=%s".format(COLS[key]))
+                        pairs.append("{}=%s".format(config_module.COLS[key]))
                     except KeyError:
                         return jsonify(error="Bad column name: {}".format(key))
                     params.append(val)
