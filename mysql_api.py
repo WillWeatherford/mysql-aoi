@@ -29,8 +29,29 @@ def connect(**kwargs):
 
 
 @app.route("/api/<table_name>", methods=["GET", "POST", "PUT", "DELETE"])
+def endpoint_multi(table_name):
+    """Route for requests getting, posting or updating multiple rows."""
+    if table_name not in config_module.VALID_TABLES:
+        abort(404)
+    func = globals()[request.method.lower()] + '_multi'
+    kwargs = request.args.to_dict()
+
+    if request.method == 'GET':
+        # Figure out how to pass in criteria... json? params?
+        return func(table_name, **kwargs)
+
+    try:
+        rows = request.json["rows"]
+    except (AttributeError, KeyError):
+        abort(400, (
+            'POST, PUT or DELETE request to this route must include json data '
+            'with {"rows": [record_obj, record_obj, ...]}'
+        ))
+    return func(table_name, rows=rows, **kwargs)
+
+
 @app.route("/api/<table_name>/<int:pk>", methods=["GET", "PUT", "DELETE"])
-def endpoint(table_name, pk=None):
+def endpoint(table_name, pk):
     """Simple get request for a single item."""
     if table_name not in config_module.VALID_TABLES:
         abort(404)
@@ -38,18 +59,10 @@ def endpoint(table_name, pk=None):
     func = globals()[request.method.lower()]
     kwargs = request.args.to_dict()
 
-    if pk is None:
-        try:
-            rows = request.json.get("rows", ())
-        except AttributeError:
-            rows = ()
-        return func(table_name, rows=rows, **kwargs)
-
     # Need to look up PK name from SQL instead
     pk_name = "entity_id" if table_name == "company" else "id"
     kwargs[pk_name] = pk
-    rows = (kwargs, )
-    return func(table_name, rows=rows, **kwargs)
+    return func(table_name, **kwargs)
 
 
 def get(table_name, columns="*", rows=(), **kwargs):
