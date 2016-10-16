@@ -76,10 +76,10 @@ def one_posted(request):
         json={'rows': [TEST_DATA]}
     )
 
-    # def delete_one():
-    #     requests.delete(TEST_DATA_PATH)
+    def delete_one():
+        requests.delete(TEST_DATA_PATH)
 
-    # request.addfinalizer(delete_one)
+    request.addfinalizer(delete_one)
     return response
 
 
