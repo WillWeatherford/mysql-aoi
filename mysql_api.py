@@ -83,7 +83,7 @@ def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
         cursor.execute(query_str, (pk, ))
     except Exception as e:
         # Return better error codes for specific errors
-        return {'errors': ''.join(e.args)}
+        return {'error': ". ".join(str(arg) for arg in e.args)}
 
     try:
         row = next(cursor)
@@ -94,11 +94,8 @@ def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
         return dict(zip(column_names, row))
 
 
-def put(pk, pk_name, table_name, **kwargs):
+def put(cursor, pk, pk_name, table_name, **kwargs):
     """Update single record by PK."""
-    conn = connect(**config_module.CONNECT_PARAMS)
-    cursor = conn.cursor()
-
     method = "UPDATE {}".format(table_name)
     set_, params = set_from_data(request.json)
     where = "WHERE {}=%s".format(pk_name)
@@ -108,21 +105,15 @@ def put(pk, pk_name, table_name, **kwargs):
 
     try:
         cursor.execute(query_str, params)
-        conn.commit()
     except Exception as e:
         # Return better error codes for specific errors
-        return jsonify(error=". ".join(str(arg) for arg in e.args))
+        return {'error': ". ".join(str(arg) for arg in e.args)}
     else:
-        cursor.close()
-        conn.close()
-        return jsonify(success=1)
+        return {'success': 1}
 
 
-def delete(pk, pk_name, table_name, **kwargs):
+def delete(cursor, pk, pk_name, table_name, **kwargs):
     """Delete single record by PK."""
-    conn = connect(**config_module.CONNECT_PARAMS)
-    cursor = conn.cursor()
-
     method = "DELETE FROM {}".format(table_name)
     where = "WHERE {}=%s".format(pk_name)
     query_str = " ".join((method, where))
@@ -130,14 +121,11 @@ def delete(pk, pk_name, table_name, **kwargs):
 
     try:
         cursor.execute(query_str, params)
-        conn.commit()
     except Exception as e:
         # Return better error codes for specific errors
-        return jsonify(error=". ".join(str(arg) for arg in e.args))
+        return {'error': ". ".join(str(arg) for arg in e.args)}
     else:
-        cursor.close()
-        conn.close()
-        return jsonify(success=1)
+        return {'success': 1}
 
 # Methods for multiple records
 
