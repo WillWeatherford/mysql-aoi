@@ -24,10 +24,12 @@ COLS = config_module.COLS
 app = Flask(__name__)
 
 
-def connect(**kwargs):
+def connect():
     """Return a new connection to the MySQL database."""
     try:
-        return connector.connect(**kwargs)
+        conn = connector.connect(**config_module.CONNECT_PARAMS)
+        cursor = conn.cursor()
+        return conn, cursor
     except connector.Error as err:
         raise err
 
@@ -43,7 +45,12 @@ def endpoint(table_name, pk):
 
     # Need to look up PK name from SQL instead
     pk_name = "entity_id" if table_name == "company" else "id"
-    return func(pk, pk_name, table_name, **kwargs)
+
+    conn, cursor = connect()
+    results = func(cursor, pk, pk_name, table_name, **kwargs)
+    conn.commit()
+    conn.close()
+    return jsonify(**results)
 
 
 @app.route("/api/<table_name>", methods=["GET", "POST", "PUT", "DELETE"])
@@ -68,17 +75,15 @@ def endpoint_multi(table_name):
     return func(table_name, rows=rows, **kwargs)
 
 
-def get(pk, pk_name, table_name, columns="*", **kwargs):
+def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
     """Generate result from select call to MySQL database."""
-    conn = connect(**config_module.CONNECT_PARAMS)
-    cursor = conn.cursor()
     query_str = "SELECT * from {} WHERE {}=%s".format(table_name, pk_name)
 
     try:
         cursor.execute(query_str, (pk, ))
     except Exception as e:
         # Return better error codes for specific errors
-        return jsonify(error="".join(e.args))
+        return {'errors': ''.join(e.args)}
 
     try:
         row = next(cursor)
@@ -86,7 +91,7 @@ def get(pk, pk_name, table_name, columns="*", **kwargs):
         abort(404, "Record with primary key {} not found.".format(pk))
     else:
         column_names = cursor.column_names
-        return jsonify(**dict(zip(column_names, row)))
+        return dict(zip(column_names, row))
 
 
 def put(pk, pk_name, table_name, **kwargs):
