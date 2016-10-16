@@ -33,7 +33,7 @@ def endpoint_multi(table_name):
     """Route for requests getting, posting or updating multiple rows."""
     if table_name not in config_module.VALID_TABLES:
         abort(404)
-    func = globals()[request.method.lower()] + '_multi'
+    func = globals()[request.method.lower()] + '_multiple'
     kwargs = request.args.to_dict()
 
     if request.method == 'GET':
@@ -47,7 +47,7 @@ def endpoint_multi(table_name):
             'POST, PUT or DELETE request to this route must include json data '
             'with {"rows": [record_obj, record_obj, ...]}'
         ))
-    return func(table_name, rows=rows, **kwargs)
+    return func(pk, table_name, rows=rows, **kwargs)
 
 
 @app.route("/api/<table_name>/<int:pk>", methods=["GET", "PUT", "DELETE"])
@@ -60,39 +60,34 @@ def endpoint(table_name, pk):
     kwargs = request.args.to_dict()
 
     # Need to look up PK name from SQL instead
-    pk_name = "entity_id" if table_name == "company" else "id"
-    kwargs[pk_name] = pk
     return func(table_name, **kwargs)
 
 
-def get(table_name, columns="*", rows=(), **kwargs):
+def get(pk, table_name, columns="*", **kwargs):
     """Generate results from select call to MySQL database."""
     conn = connect(**config_module.CONNECT_PARAMS)
     cursor = conn.cursor()
+    pk_name = "entity_id" if table_name == "company" else "id"
 
-    params = []
-    method = "SELECT * from {}".format(table_name)
-
-    if not kwargs:
-        query_string = method
-    else:
-        pairs = []
-        for key, val in kwargs.items():
-            try:
-                pairs.append("{}=%s".format(config_module.COLS[key]))
-            except KeyError:
-                return jsonify(error="Bad column name: {}".format(key))
-            params.append(val)
-
-        query_string = " ".join((method, "WHERE", " AND ".join(pairs)))
+    query_str = "SELECT * from {} WHERE {}=%s".format(table_name, pk_name)
 
     try:
-        cursor.execute(query_string, params)
+        cursor.execute(query_str, (pk, ))
     except Exception as e:
+        # Return better error codes for specific errors
         return jsonify(error="".join(e.args))
 
-    column_names = cursor.column_names
-    return jsonify(rows=[dict(zip(column_names, row)) for row in cursor])
+    try:
+        row = next(cursor)
+    except StopIteration:
+        abort(404, "Record with primary key {} not found.".format(pk))
+    else:
+        column_names = cursor.column_names
+        return jsonify(dict(zip(column_names, row)))
+
+
+def get_multiple():
+    """Return multiple rows of data, matching specified criteria."""
 
 
 def post(table_name, **kwargs):
