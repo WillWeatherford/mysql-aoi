@@ -11,10 +11,11 @@ from __future__ import unicode_literals, print_function, division
 # Local config.py file holding settings.
 import os
 from mysql import connector
-from itertools import chain
 from collections import OrderedDict
 from importlib import import_module
 from flask import Flask, jsonify, request, abort
+
+DEFAULT_NUM_ROWS = 100
 
 config_module = import_module(os.environ['MYSQL_CONFIG_MODULE'])
 COLS = config_module.COLS
@@ -112,9 +113,31 @@ def put(pk, pk_name, table_name, **kwargs):
         return jsonify(success=1)
 
 
+def delete(pk, pk_name, table_name, **kwargs):
+    """Delete single record by PK."""
+    conn = connect(**config_module.CONNECT_PARAMS)
+    cursor = conn.cursor()
+
+    method = "DELETE FROM {}".format(table_name)
+    where = "WHERE {}=%s".format(pk_name)
+    query_str = " ".join((method, where))
+    params = [pk]
+
+    try:
+        cursor.execute(query_str, params)
+        conn.commit()
+    except Exception as e:
+        # Return better error codes for specific errors
+        return jsonify(error=". ".join(str(arg) for arg in e.args))
+    else:
+        cursor.close()
+        conn.close()
+        return jsonify(success=1)
+
 # Methods for multiple records
 
-def get_multiple():
+
+def get_multiple(num_rows=DEFAULT_NUM_ROWS, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
 
 
@@ -154,34 +177,27 @@ def post_put_delete_multiple(method_str, rows=(), pk_name=None, set_str=False, *
     conn = connect(**config_module.CONNECT_PARAMS)
     cursor = conn.cursor()
 
-    params = []
-
     success_count = 0
-    try:
-        for row_dict in rows:
-            query_parts = [method_str]
-            if set_str:
-                pairs = []
-                for key, val in row_dict.items():
-                    try:
-                        pairs.append("{}=%s".format(config_module.COLS[key]))
-                    except KeyError:
-                        return jsonify(error="Bad column name: {}".format(key))
-                    params.append(val)
-                query_parts.append("SET")
-                query_parts.append(", ".join(pairs))
-            if pk_name:
-                query_parts.append("WHERE {}=%s".format(pk_name))
-                params.append(row_dict[pk_name])
-            query_string = " ".join(query_parts)
+    for row_dict in rows:
+        params = []
+        query_parts = [method_str]
+        if set_str:
+            set_, values = set_from_data(row_dict)
+            query_parts.append(set_)
+            params.extend(values)
+        if pk_name:
+            query_parts.append("WHERE {}=%s".format(pk_name))
+            params.append(row_dict[pk_name])
+        query_string = " ".join(query_parts)
+        try:
             cursor.execute(query_string, params)
-
+        except Exception as e:
+            return jsonify(error="".join(e.args))
+        else:
             success_count += 1
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        return jsonify(error="".join(e.args))
+    conn.commit()
+    cursor.close()
+    conn.close()
 
     return jsonify(success=success_count)
 
