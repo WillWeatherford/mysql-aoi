@@ -20,6 +20,12 @@ DEFAULT_NUM_ROWS = 100
 config_module = import_module(os.environ['MYSQL_CONFIG_MODULE'])
 COLS = config_module.COLS
 
+METHODS = {
+    'GET': "",
+    'POST': "INSERT INTO {}",
+    'PUT': "UPDATE {}",
+    'DELETE': "DELETE FROM {}",
+}
 
 app = Flask(__name__)
 
@@ -60,14 +66,17 @@ def endpoint_multi(table_name):
     """Route getting, posting, updating or deleting multiple rows."""
     if table_name not in config_module.VALID_TABLES:
         abort(404)
-    func = globals()[request.method.lower() + '_multiple']
     kwargs = request.args.to_dict()
 
+    conn, cursor = connect()
     if request.method == 'GET':
         # Figure out how to pass in criteria... json? params?
-        return func(table_name, **kwargs)
-
-    return func(table_name, **kwargs)
+        results = get_multiple(table_name, **kwargs)
+    else:
+        results = post_put_delete_multi(cursor, table_name, **kwargs)
+    conn.commit()
+    conn.close()
+    return jsonify(**results)
 
 
 def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
@@ -122,47 +131,16 @@ def delete(cursor, pk, pk_name, table_name, **kwargs):
     else:
         return {'success': 1}
 
+
 # Methods for multiple records
 
 
-def get_multiple(num_rows=DEFAULT_NUM_ROWS, **kwargs):
+def get_multiple(columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
 
 
-def post_multiple(cursor, table_name, **kwargs):
-    """Insert new data into the MySQL database.
-
-    Return number of rows inserted if successful; return failure if error.
-    Requires rows to be sent in json payload as an array mapped to the 'rows'
-    key.
-    """
-    method_str = "INSERT INTO {}".format(table_name)
-    return post_put_delete_multiple(cursor, method_str, set_str=True, **kwargs)
-
-
-def put_multiple(cursor, table_name, **kwargs):
-    """Update records in MySQL database.
-
-    Return number of rows updated if successful; return failure if error.
-    """
-    method_str = "UPDATE {}".format(table_name)
-    pk_name = "entity_id" if table_name == "company" else "id"
-    return post_put_delete_multiple(cursor, method_str, pk_name=pk_name, set_str=True, **kwargs)
-
-
-def delete_multiple(cursor, table_name, **kwargs):
-    """Delete records from MySQL database.
-
-    Return number of rows deleted if successful; return failure if error.
-    """
-    method_str = "DELETE FROM {}".format(table_name)
-    pk_name = "entity_id" if table_name == "company" else "id"
-    return post_put_delete_multiple(cursor, method_str, pk_name=pk_name, **kwargs)
-
-
-def post_put_delete_multiple(cursor, method_str, pk_name=None, set_str=False, **kwargs):
+def post_put_delete_multi(cursor, table_name, **kwargs):
     """Insert or update based on given specifications."""
-    conn, cursor = connect()
     try:
         rows = request.json["rows"]
     except (AttributeError, KeyError):
@@ -171,18 +149,25 @@ def post_put_delete_multiple(cursor, method_str, pk_name=None, set_str=False, **
             'with {"rows": [record_obj, record_obj, ...]}'
         ))
 
+    pk_name = "entity_id" if table_name == "company" else "id"
+    method = request.method
+    method_str = METHODS[method].format(table_name)
+
     success_count = 0
     errors = []
     for row_dict in rows:
-        params = []
         query_parts = [method_str]
-        if set_str:
+        params = []
+
+        if method in ('PUT', 'POST'):
             set_, values = set_from_data(row_dict)
             query_parts.append(set_)
             params.extend(values)
-        if pk_name:
+
+        if method in ('PUT', 'DELETE'):
             query_parts.append("WHERE {}=%s".format(pk_name))
             params.append(row_dict[pk_name])
+
         query_string = " ".join(query_parts)
         try:
             cursor.execute(query_string, params)
