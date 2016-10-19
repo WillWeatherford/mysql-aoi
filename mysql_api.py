@@ -30,6 +30,27 @@ METHODS = {
 app = Flask(__name__)
 
 
+class Connect(object):
+    """Context manager for MySQL database connections."""
+
+    def __init__(self, **params):
+        """Initialize the connection."""
+        self.params = params
+
+    def __enter__(self):
+        """Set up the connection and return a cursor."""
+        self.conn = connector.connect(self.params)
+        self.cursor = self.conn.cursor()
+        return self.cursor
+
+    def __exit__(self, *args):
+        """Set up the connection."""
+        self.conn.commit()
+        self.conn.close()
+        self.cursor.close()
+        return True
+
+
 def connect():
     """Return a new connection to the MySQL database."""
     try:
@@ -52,13 +73,15 @@ def endpoint(table_name, pk):
     # Need to look up PK name from SQL instead
     pk_name = "entity_id" if table_name == "company" else "id"
 
-    conn, cursor = connect()
-    results = func(cursor, pk, pk_name, table_name, **kwargs)
-    conn.commit()
-    conn.close()
-    if not cursor.rowcount:
-        abort(404)
-    return jsonify(**results)
+    # conn, cursor = connect()
+    # results = func(cursor, pk, pk_name, table_name, **kwargs)
+    # conn.commit()
+    # conn.close()
+    # if not cursor.rowcount:
+    #     abort(404)
+    with Connect(**config_module.CONNECT_PARAMS) as cursor:
+        results = func(cursor, pk, pk_name, table_name, **kwargs)
+        return jsonify(**results)
 
 
 @app.route("/api/<table_name>", methods=["GET", "POST", "PUT", "DELETE"])
