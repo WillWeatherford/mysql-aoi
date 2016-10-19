@@ -39,7 +39,7 @@ class Connect(object):
 
     def __enter__(self):
         """Set up the connection and return a cursor."""
-        self.conn = connector.connect(self.params)
+        self.conn = connector.connect(**self.params)
         self.cursor = self.conn.cursor()
         return self.cursor
 
