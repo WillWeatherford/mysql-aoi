@@ -18,6 +18,15 @@ TEST_RECORD = {
 }
 TEST_RECORD_PATH = '/'.join((API_URL, 'company', TEST_RECORD['entity_id']))
 
+NUM_TEST_RECORDS = 12
+
+TEST_RECORDS = []
+for n in range(NUM_TEST_RECORDS):
+    record = TEST_RECORD.copy()
+    for key, val in record.items():
+        record[key] = val + str(n)
+    TEST_RECORDS.append(record)
+
 
 @pytest.fixture(scope='session')
 def app():
