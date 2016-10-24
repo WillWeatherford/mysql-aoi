@@ -90,11 +90,11 @@ def test_get_one():
     assert resp.json().get('entity_id') == '1'
 
 
-# def test_get_one_hundred():
-#     """Test getting one record from the real database."""
-#     resp = requests.get('/'.join((API_URL, 'company')), params={'num_rows': 100})
-#     assert resp.status_code == 200
-#     assert len(resp.json().get('rows')) == 100
+def test_get_one_hundred():
+    """Test getting one record from the real database."""
+    resp = requests.get('/'.join((API_URL, 'company')), params={'num_rows': 100})
+    assert resp.status_code == 200
+    assert len(resp.json().get('rows')) == 100
 
 
 def test_one_posted_status(one_posted):
@@ -107,15 +107,10 @@ def test_one_posted_success(one_posted):
     assert one_posted.json().get('success') == 1
 
 
-def test_one_posted_get_status(one_posted):
+def test_one_posted_get(one_posted):
     """Test that posting one to real DB gives success response."""
     get_resp = requests.get(TEST_RECORD_PATH)
     assert get_resp.status_code == 200
-
-
-def test_one_posted_get_data(one_posted):
-    """Test that posting one to real DB gives success response."""
-    get_resp = requests.get(TEST_RECORD_PATH)
     assert get_resp.json() == TEST_RECORD
 
 
@@ -132,4 +127,5 @@ def test_one_posted_update(one_posted):
 def test_one_posted_delete(one_posted):
     """Test that posting one to real DB gives success response."""
     delete_resp = requests.delete(TEST_RECORD_PATH)
+    assert delete_resp.status_code == 200
     assert delete_resp.json().get('success') == 1
