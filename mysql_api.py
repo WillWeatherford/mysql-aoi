@@ -59,23 +59,23 @@ class Connect(object):
         self.conn.close()
         self.cursor.close()
         if self.debug:
-            print('Complete connect __enter__')
-        return True
+            print('Complete connect __exit__')
+        return False
 
 
-def connect():
-    """Return a new connection to the MySQL database."""
-    try:
-        conn = connector.connect(**config_module.CONNECT_PARAMS)
-        cursor = conn.cursor()
-        return conn, cursor
-    except connector.Error as err:
-        raise err
+# def connect():
+#     """Return a new connection to the MySQL database."""
+#     try:
+#         conn = connector.connect(**config_module.CONNECT_PARAMS)
+#         cursor = conn.cursor()
+#         return conn, cursor
+#     except connector.Error as err:
+#         raise err
 
 
 @app.route("/api/<table_name>/<int:pk>", methods=["GET", "PUT", "DELETE"])
 def endpoint(table_name, pk):
-    """Simple get request for a single item."""
+    """Simple get, put or delete request for a single item."""
     if table_name not in config_module.VALID_TABLES:
         abort(404)
 
@@ -85,14 +85,10 @@ def endpoint(table_name, pk):
     # Need to look up PK name from SQL instead
     pk_name = "entity_id" if table_name == "company" else "id"
 
-    # conn, cursor = connect()
-    # results = func(cursor, pk, pk_name, table_name, **kwargs)
-    # conn.commit()
-    # conn.close()
     with Connect(**config_module.CONNECT_PARAMS) as cursor:
         results = func(cursor, pk, pk_name, table_name, **kwargs)
         if not cursor.rowcount:
-            abort(404)
+            abort(404, "{} not found by primary key {}".format(table_name, pk))
         return jsonify(**results)
 
 
@@ -103,15 +99,13 @@ def endpoint_multi(table_name):
         abort(404)
     kwargs = request.args.to_dict()
 
-    conn, cursor = connect()
-    if request.method == 'GET':
-        # Figure out how to pass in criteria... json? params?
-        results = get_multiple(table_name, **kwargs)
-    else:
-        results = post_put_delete_multi(cursor, table_name, **kwargs)
-    conn.commit()
-    conn.close()
-    return jsonify(**results)
+    with Connect(**config_module.CONNECT_PARAMS) as cursor:
+        if request.method == 'GET':
+            # Figure out how to pass in criteria... json? params?
+            results = get_multiple(cursor, table_name, **kwargs)
+        else:
+            results = post_put_delete_multi(cursor, table_name, **kwargs)
+        return jsonify(**results)
 
 
 def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
@@ -170,7 +164,7 @@ def delete(cursor, pk, pk_name, table_name, **kwargs):
 # Methods for multiple records
 
 
-def get_multiple(columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
+def get_multiple(cursor, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
 
 

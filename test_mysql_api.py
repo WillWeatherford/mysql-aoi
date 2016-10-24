@@ -10,13 +10,13 @@ from mysql import connector
 API_URL = 'http://127.0.0.1:5000/api'
 
 
-TEST_DATA = {
+TEST_RECORD = {
     'entity_id': '999999999',
     'co_name': 'TestCorp',
     'pbid': '999999999',
     'weburl': 'www.test-test-test.biz',
 }
-TEST_DATA_PATH = '/'.join((API_URL, 'company', TEST_DATA['entity_id']))
+TEST_RECORD_PATH = '/'.join((API_URL, 'company', TEST_RECORD['entity_id']))
 
 
 @pytest.fixture(scope='session')
@@ -73,11 +73,11 @@ def one_posted(request):
     """Set up by posting a new record to the actual live database."""
     response = requests.post(
         '/'.join((API_URL, 'company')),
-        json={'rows': [TEST_DATA]}
+        json={'rows': [TEST_RECORD]}
     )
 
     def delete_one():
-        requests.delete(TEST_DATA_PATH)
+        requests.delete(TEST_RECORD_PATH)
 
     request.addfinalizer(delete_one)
     return response
@@ -87,7 +87,7 @@ def test_get_one():
     """Test getting one record from the real database."""
     resp = requests.get('/'.join((API_URL, 'company', '1')))
     assert resp.status_code == 200
-    assert resp.json().get('entity_id') == 1
+    assert resp.json().get('entity_id') == '1'
 
 
 # def test_get_one_hundred():
@@ -109,20 +109,20 @@ def test_one_posted_success(one_posted):
 
 def test_one_posted_get_status(one_posted):
     """Test that posting one to real DB gives success response."""
-    get_resp = requests.get(TEST_DATA_PATH)
+    get_resp = requests.get(TEST_RECORD_PATH)
     assert get_resp.status_code == 200
 
 
 def test_one_posted_get_data(one_posted):
     """Test that posting one to real DB gives success response."""
-    get_resp = requests.get(TEST_DATA_PATH)
-    assert get_resp.json() == TEST_DATA
+    get_resp = requests.get(TEST_RECORD_PATH)
+    assert get_resp.json() == TEST_RECORD
 
 
 def test_one_posted_update(one_posted):
     """Test that posting one to real DB gives success response."""
     update_resp = requests.put(
-        TEST_DATA_PATH,
+        TEST_RECORD_PATH,
         json={'weburl': 'www.better-test-company.biz'},
     )
     assert update_resp.status_code == 200
@@ -131,5 +131,5 @@ def test_one_posted_update(one_posted):
 
 def test_one_posted_delete(one_posted):
     """Test that posting one to real DB gives success response."""
-    delete_resp = requests.delete(TEST_DATA_PATH)
+    delete_resp = requests.delete(TEST_RECORD_PATH)
     assert delete_resp.json().get('success') == 1
