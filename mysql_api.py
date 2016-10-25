@@ -63,16 +63,6 @@ class Connect(object):
         return False
 
 
-# def connect():
-#     """Return a new connection to the MySQL database."""
-#     try:
-#         conn = connector.connect(**config_module.CONNECT_PARAMS)
-#         cursor = conn.cursor()
-#         return conn, cursor
-#     except connector.Error as err:
-#         raise err
-
-
 @app.route("/api/<table_name>/<int:pk>", methods=["GET", "PUT", "DELETE"])
 def endpoint(table_name, pk):
     """Simple get, put or delete request for a single item."""
@@ -102,7 +92,7 @@ def endpoint_multi(table_name):
     with Connect(**config_module.CONNECT_PARAMS) as cursor:
         if request.method == 'GET':
             # Figure out how to pass in criteria... json? params?
-            results = get_multiple(cursor, table_name, **kwargs)
+            results = get_multi(cursor, table_name, **kwargs)
         else:
             results = post_put_delete_multi(cursor, table_name, **kwargs)
         return jsonify(**results)
@@ -127,6 +117,11 @@ def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
         return dict(zip(column_names, row))
 
 
+def post_put_delete():
+    """Create, update or delete a record."""
+    pass
+
+
 def put(cursor, pk, pk_name, table_name, **kwargs):
     """Update single record by PK."""
     method = "UPDATE {}".format(table_name)
@@ -140,7 +135,7 @@ def put(cursor, pk, pk_name, table_name, **kwargs):
         cursor.execute(query_str, params)
     except Exception as e:
         # Return better error codes for specific errors
-        return {'error': ". ".join(str(arg) for arg in e.args)}
+        return {'errors': ". ".join(str(arg) for arg in e.args)}
     else:
         return {'success': 1}
 
@@ -156,7 +151,7 @@ def delete(cursor, pk, pk_name, table_name, **kwargs):
         cursor.execute(query_str, params)
     except Exception as e:
         # Return better error codes for specific errors
-        return {'error': ". ".join(str(arg) for arg in e.args)}
+        return {'errors': ". ".join(str(arg) for arg in e.args)}
     else:
         return {'success': 1}
 
@@ -164,8 +159,19 @@ def delete(cursor, pk, pk_name, table_name, **kwargs):
 # Methods for multiple records
 
 
-def get_multiple(cursor, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
+def get_multi(cursor, table_name, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
+    params = [int(num_rows)]
+    query_str = "SELECT * FROM {} LIMIT %s;".format(table_name)
+
+    try:
+        cursor.execute(query_str, params)
+    except Exception as e:
+        # Return better error codes for specific errors
+        return {'errors': ". ".join(str(arg) for arg in e.args)}
+
+    column_names = cursor.column_names
+    return {'rows': [dict(zip(column_names, row)) for row in cursor]}
 
 
 def post_put_delete_multi(cursor, table_name, **kwargs):
