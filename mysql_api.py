@@ -15,7 +15,8 @@ from collections import OrderedDict
 from importlib import import_module
 from flask import Flask, jsonify, request, abort
 
-DEFAULT_NUM_ROWS = 100
+DEFAULT_NUM_ROWS = 20
+MAX_NUM_ROWS = 100
 
 config_module = import_module(os.environ['MYSQL_CONFIG_MODULE'])
 COLS = config_module.COLS
@@ -153,6 +154,8 @@ def post_put_delete(cursor, pk, table_name, **kwargs):
 
 def get_multi(cursor, table_name, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
+    if num_rows > MAX_NUM_ROWS:
+        abort(400, "Maximum num_rows in GET request: {}".format(MAX_NUM_ROWS))
     params = [int(num_rows)]
     query_str = "SELECT * FROM {} LIMIT %s;".format(table_name)
 
@@ -179,6 +182,9 @@ def post_put_delete_multi(cursor, table_name, **kwargs):
     pk_name = "entity_id" if table_name == "company" else "id"
     method = request.method
     method_str = METHODS[method].format(table_name)
+
+    if len(rows) > MAX_NUM_ROWS:
+        abort(400, "Maximum rows in {} request: {}".format(method, MAX_NUM_ROWS))
 
     success_count = 0
     errors = []
