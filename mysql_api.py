@@ -164,21 +164,28 @@ def post_put_delete(cursor, pk, table_name, **kwargs):
 ##############################
 # Multiple item methods
 
-def get_multi(cursor, table_name, columns=None, num_rows=DEFAULT_NUM_ROWS, **kwargs):
+def get_multi(cursor, table_name, columns=None, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
-    num_rows = int(num_rows)
+    data = request.json or {}
+
+    num_rows = int(data.get('num_rows', DEFAULT_NUM_ROWS))
     if num_rows > MAX_NUM_ROWS:
         abort(400, "Maximum num_rows in GET request: {}".format(MAX_NUM_ROWS))
 
-    if columns:
-        columns_str = make_columns_str(columns)
-    else:
-        columns_str = "*"
+    params = [num_rows]
 
-    query_str = "SELECT {} FROM {} LIMIT %s;".format(columns_str, table_name)
+    columns_str = make_columns_str(data.get('columns'))
+
+    query_str = "SELECT {} FROM {} LIMIT %s".format(columns_str, table_name)
+
+    criteria = data.get('criteria')
+    if criteria:
+        criteria_str, values = make_criteria_str(criteria)
+        query_str = " ".join((query_str, criteria_str))
+        params.extend(values)
 
     try:
-        cursor.execute(query_str, (num_rows, ))
+        cursor.execute(query_str, params)
     except Exception:
         # Return better error codes for specific errors
         abort(500, "Something went wrong with your query.")
@@ -248,7 +255,26 @@ def set_from_data(data):
 
 def make_columns_str(columns):
     """Make a column string to be included in a SELECT query."""
-    invalid = set(config_module.VALID_COLUMN_NAMES) - set(columns)
+    if not columns:
+        return "*"
+    invalid = set(COLS) - set(columns)
     if invalid:
         abort(400, "Invalid column names. {}".format(', '.join(invalid)))
     return ", ".join(columns)
+
+
+def make_criteria_str(criteria):
+    """Make a filters for WHERE query."""
+    try:
+        data = OrderedDict(criteria)
+    except TypeError:
+        abort(400, "Badly formatted criteria.")
+
+    pairs = []
+    for key in data.keys():
+        try:
+            pairs.append("{}=%s".format(COLS[key]))
+        except KeyError:
+            abort(400, "Bad column name in criteria: {}".format(key))
+
+    return " AND ".join(pairs), list(data.values())

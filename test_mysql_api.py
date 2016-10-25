@@ -90,7 +90,7 @@ def test_get_many():
     """Test getting one record from the real database."""
     resp = requests.get(
         '/'.join((API_URL, 'company')),
-        params={'num_rows': NUM_TEST_RECORDS}
+        json={'num_rows': NUM_TEST_RECORDS}
     )
     assert resp.status_code == 200
     assert len(resp.json().get('rows')) == NUM_TEST_RECORDS
