@@ -78,7 +78,7 @@ def endpoint(table_name, pk):
     with Connect(**config_module.CONNECT_PARAMS) as cursor:
         if request.method == 'GET':
             # Figure out how to pass in criteria... json? params?
-            results = get(cursor, pk, table_name, columns="*", **kwargs)
+            results = get(cursor, pk, table_name, **kwargs)
         else:
             results = post_put_delete(cursor, pk, table_name, **kwargs)
         if not cursor.rowcount:
@@ -107,11 +107,17 @@ def endpoint_multi(table_name):
 #####################
 # Single item methods
 
-def get(cursor, pk, table_name, columns="*", **kwargs):
+def get(cursor, pk, table_name, columns=None, **kwargs):
     """Generate result from select call to MySQL database."""
     pk_name = "entity_id" if table_name == "company" else "id"
-    query_str = "SELECT * from {} WHERE {}=%s".format(table_name, pk_name)
+    if columns:
+        columns_str = make_columns_str(columns)
+    else:
+        columns_str = "*"
 
+    query_str = "SELECT {} from {} WHERE {}=%s".format(
+        columns_str, table_name, pk_name
+    )
     try:
         cursor.execute(query_str, (pk, ))
     except Exception:
@@ -158,15 +164,21 @@ def post_put_delete(cursor, pk, table_name, **kwargs):
 ##############################
 # Multiple item methods
 
-def get_multi(cursor, table_name, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
+def get_multi(cursor, table_name, columns=None, num_rows=DEFAULT_NUM_ROWS, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
+    num_rows = int(num_rows)
     if num_rows > MAX_NUM_ROWS:
         abort(400, "Maximum num_rows in GET request: {}".format(MAX_NUM_ROWS))
-    params = [int(num_rows)]
-    query_str = "SELECT * FROM {} LIMIT %s;".format(table_name)
+
+    if columns:
+        columns_str = make_columns_str(columns)
+    else:
+        columns_str = "*"
+
+    query_str = "SELECT {} FROM {} LIMIT %s;".format(columns_str, table_name)
 
     try:
-        cursor.execute(query_str, params)
+        cursor.execute(query_str, (num_rows, ))
     except Exception:
         # Return better error codes for specific errors
         abort(500, "Something went wrong with your query.")
@@ -232,3 +244,11 @@ def set_from_data(data):
             abort(400, "Bad column name: {}".format(key))
 
     return "SET " + ", ".join(pairs), list(data.values())
+
+
+def make_columns_str(columns):
+    """Make a column string to be included in a SELECT query."""
+    invalid = set(config_module.VALID_COLUMN_NAMES) - set(columns)
+    if invalid:
+        abort(400, "Invalid column names. {}".format(', '.join(invalid)))
+    return ", ".join(columns)
