@@ -172,17 +172,18 @@ def get_multi(cursor, table_name, columns=None, **kwargs):
     if num_rows > MAX_NUM_ROWS:
         abort(400, "Maximum num_rows in GET request: {}".format(MAX_NUM_ROWS))
 
-    params = [num_rows]
-
+    params = []
     columns_str = make_columns_str(data.get('columns'))
-
-    query_str = "SELECT {} FROM {} LIMIT %s".format(columns_str, table_name)
+    query_str = "SELECT {} FROM {}".format(columns_str, table_name)
 
     criteria = data.get('criteria')
     if criteria:
         criteria_str, values = make_criteria_str(criteria)
         query_str = " ".join((query_str, criteria_str))
         params.extend(values)
+
+    query_str += " LIMIT %s"
+    params.append(num_rows)
 
     try:
         cursor.execute(query_str, params)
@@ -277,4 +278,4 @@ def make_criteria_str(criteria):
         except KeyError:
             abort(400, "Bad column name in criteria: {}".format(key))
 
-    return " AND ".join(pairs), list(data.values())
+    return "WHERE " + " AND ".join(pairs), list(data.values())
