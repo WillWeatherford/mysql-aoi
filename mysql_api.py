@@ -64,6 +64,9 @@ class Connect(object):
         return False
 
 
+##########################
+# Routes
+
 @app.route("/api/<table_name>/<int:pk>", methods=["GET", "PUT", "DELETE"])
 def endpoint(table_name, pk):
     """Simple get, put or delete request for a single item."""
@@ -101,6 +104,9 @@ def endpoint_multi(table_name):
         return jsonify(**results)
 
 
+#####################
+# Single item methods
+
 def get(cursor, pk, table_name, columns="*", **kwargs):
     """Generate result from select call to MySQL database."""
     pk_name = "entity_id" if table_name == "company" else "id"
@@ -108,9 +114,9 @@ def get(cursor, pk, table_name, columns="*", **kwargs):
 
     try:
         cursor.execute(query_str, (pk, ))
-    except Exception as e:
+    except Exception:
         # Return better error codes for specific errors
-        return {'error': ". ".join(str(arg) for arg in e.args)}
+        abort(500, "Something went wrong with your query.")
 
     try:
         row = next(cursor)
@@ -142,15 +148,15 @@ def post_put_delete(cursor, pk, table_name, **kwargs):
 
     try:
         cursor.execute(query_str, params)
-    except Exception as e:
+    except Exception:
         # Return better error codes for specific errors
-        return {'errors': ". ".join(str(arg) for arg in e.args)}
+        abort(500, "Something went wrong with your query.")
     else:
         return {'success': 1}
 
 
-# Methods for multiple records
-
+##############################
+# Multiple item methods
 
 def get_multi(cursor, table_name, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
@@ -161,9 +167,9 @@ def get_multi(cursor, table_name, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwar
 
     try:
         cursor.execute(query_str, params)
-    except Exception as e:
+    except Exception:
         # Return better error codes for specific errors
-        return {'errors': ". ".join(str(arg) for arg in e.args)}
+        abort(500, "Something went wrong with your query.")
 
     column_names = cursor.column_names
     return {'rows': [dict(zip(column_names, row)) for row in cursor]}
@@ -204,8 +210,8 @@ def post_put_delete_multi(cursor, table_name, **kwargs):
         query_string = " ".join(query_parts)
         try:
             cursor.execute(query_string, params)
-        except Exception as e:
-            errors.append(". ".join(str(arg) for arg in e.args))
+        except Exception:
+            errors.append(row_dict)
         else:
             success_count += 1
     return {'success': success_count, 'errors': errors}
