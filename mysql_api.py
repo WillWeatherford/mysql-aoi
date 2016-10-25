@@ -71,15 +71,12 @@ def endpoint(table_name, pk):
 
     kwargs = request.args.to_dict()
 
-    # Need to look up PK name from SQL instead
-    pk_name = "entity_id" if table_name == "company" else "id"
-
     with Connect(**config_module.CONNECT_PARAMS) as cursor:
         if request.method == 'GET':
             # Figure out how to pass in criteria... json? params?
-            results = get(cursor, pk, pk_name, table_name, columns="*", **kwargs)
+            results = get(cursor, pk, table_name, columns="*", **kwargs)
         else:
-            results = post_put_delete(cursor, pk, pk_name, table_name, columns="*", **kwargs)
+            results = post_put_delete(cursor, pk, table_name, **kwargs)
         if not cursor.rowcount:
             abort(404, "{} not found by primary key {}".format(table_name, pk))
         return jsonify(**results)
@@ -101,8 +98,9 @@ def endpoint_multi(table_name):
         return jsonify(**results)
 
 
-def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
+def get(cursor, pk, table_name, columns="*", **kwargs):
     """Generate result from select call to MySQL database."""
+    pk_name = "entity_id" if table_name == "company" else "id"
     query_str = "SELECT * from {} WHERE {}=%s".format(table_name, pk_name)
 
     try:
@@ -120,8 +118,9 @@ def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
         return dict(zip(column_names, row))
 
 
-def post_put_delete(cursor, pk, pk_name, table_name, **kwargs):
+def post_put_delete(cursor, pk, table_name, **kwargs):
     """Create, update or delete a record."""
+    pk_name = "entity_id" if table_name == "company" else "id"
     method = request.method
     method_str = METHODS[method].format(table_name)
     query_parts = [method_str]
