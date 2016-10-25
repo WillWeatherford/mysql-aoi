@@ -34,33 +34,21 @@ app = Flask(__name__)
 class Connect(object):
     """Context manager for MySQL database connections."""
 
-    def __init__(self, debug=False, **params):
+    def __init__(self, **params):
         """Initialize the connection."""
-        self.debug = debug
-        if self.debug:
-            print('Initializing Connect()')
         self.params = params
 
     def __enter__(self):
         """Set up the connection and return a cursor."""
-        if self.debug:
-            print('Begin connect __enter__')
         self.conn = connector.connect(**self.params)
         self.cursor = self.conn.cursor()
-        if self.debug:
-            print('Complete connect __enter__')
         return self.cursor
 
     def __exit__(self, *args):
         """Set up the connection."""
-        if self.debug:
-            print('Begin connect __exit__')
-            print('Error args: {}'.format(args))
         self.conn.commit()
         self.conn.close()
         self.cursor.close()
-        if self.debug:
-            print('Complete connect __exit__')
         return False
 
 
@@ -97,7 +85,7 @@ def endpoint_multi(table_name):
         if request.method == 'GET':
             # Figure out how to pass in criteria... json? params?
             results = get_multi(cursor, table_name, **kwargs)
-        elif request.method == 'POST' and not request.json.get('rows'):
+        elif request.method == 'POST' and request.json and not request.json.get('rows'):
             results = post_put_delete(cursor, None, table_name, **kwargs)
         else:
             results = post_put_delete_multi(cursor, table_name, **kwargs)
@@ -197,7 +185,7 @@ def post_put_delete_multi(cursor, table_name, **kwargs):
     """Insert or update based on given specifications."""
     try:
         rows = request.json["rows"]
-    except (AttributeError, KeyError):
+    except (AttributeError, TypeError, KeyError):
         abort(400, (
             'POST, PUT or DELETE request to this route must include json data '
             'with {"rows": [record_obj, record_obj, ...]}'

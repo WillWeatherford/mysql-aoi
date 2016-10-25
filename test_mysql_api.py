@@ -4,6 +4,7 @@ import os
 import json
 import pytest
 import requests
+import config
 import config_test
 from copy import deepcopy
 from mysql import connector
@@ -31,51 +32,34 @@ for n in range(NUM_TEST_RECORDS):
     TEST_RECORDS.append(record)
 
 
-@pytest.fixture(scope='session')
-def app():
-    """Set the config module value in the os environment to test."""
-    os.environ['MYSQL_CONFIG_MODULE'] = 'config_test'
-    import mysql_api
-    app = mysql_api.app.test_client()
-    return app
+# @pytest.fixture(scope='session')
+# def app():
+#     """Set the config module value in the os environment to test."""
+#     os.environ['MYSQL_CONFIG_MODULE'] = 'config_test'
+#     import mysql_api
+#     app = mysql_api.app.test_client()
+#     return app
 
 
-@pytest.fixture
-def create_tables(request):
-    """Create tables for testing."""
-    conn = connector.connect(**config_test.CONNECT_PARAMS)
-    cursor = conn.cursor()
-    cursor.execute(config_test.TABLES['company'])
+# @pytest.fixture
+# def create_tables(request):
+#     """Create tables for testing."""
+#     conn = connector.connect(**config_test.CONNECT_PARAMS)
+#     cursor = conn.cursor()
+#     cursor.execute(config_test.TABLES['company'])
 
-    def teardown():
-        cursor.execute('DROP TABLE `company`')
-        cursor.close()
-        conn.close()
+#     def teardown():
+#         cursor.execute('DROP TABLE `company`')
+#         cursor.close()
+#         conn.close()
 
-    request.addfinalizer(teardown)
-
-
-# def test_get_all(create_tables, app):
-#     """Test that a get request successfully gets stuff."""
-#     url = '/'.join((API_URL, 'company'))
-#     response = app.get(url)
-#     import pdb;pdb.set_trace()
-#     assert 'rows' in response.json()
+#     request.addfinalizer(teardown)
 
 
-# def test_post_one(create_tables, app):
-#     """Test that new data can be posted."""
-#     data = {'rows': [{
-#         'entity_id': 1,
-#         'weburl': 'www.site.com',
-#         'co_name': 'TestCo',
-#         'pbid': '1',
-#     }]}
-#     url = '/'.join((API_URL, 'company'))
-#     response = app.post(url, data=json.dumps(data))
-
-#     assert response.status_code == 200
-#     # assert response.json() == {'success': 1}
+@pytest.fixture(params=config.VALID_TABLES)
+def table_name(request):
+    """Parametrized fixture iterating over table names."""
+    return request.param
 
 
 # SYSTEM TESTS ON RUNNING SERVER
@@ -88,10 +72,10 @@ def test_get_one():
     assert resp.json().get('entity_id') == '1'
 
 
-def test_get_many():
+def test_get_many(table_name):
     """Test getting one record from the real database."""
     resp = requests.get(
-        '/'.join((API_URL, 'company')),
+        '/'.join((API_URL, table_name)),
         json={'num_rows': NUM_TEST_RECORDS}
     )
     assert resp.status_code == 200
@@ -214,3 +198,42 @@ def test_many_posted_delete(many_posted):
     )
     assert delete_resp.status_code == 200
     assert delete_resp.json().get('success') == NUM_TEST_RECORDS
+
+
+###########################
+# Fail case tests
+
+@pytest.mark.parametrize('method', ('GET', 'PUT', 'DELETE'))
+def test_bad_pk_404(method, table_name):
+    """Test that a 404 response is returned when a bad PK path is given."""
+    pk = "definitelynotarealpk"
+    method_func = getattr(requests, method.lower())
+    path = '/'.join((API_URL, table_name, pk))
+    response = method_func(path, json={})
+    assert response.status_code == 404
+
+
+def test_post_bad_data(table_name):
+    """Test that POST throws an error when given bad data."""
+    row = TEST_RECORD.copy()
+    row['badcolname'] = 'badval'
+    post_resp = requests.post('/'.join((API_URL, table_name)), json=row)
+    assert post_resp.status_code == 400
+
+
+def test_put_bad_data(one_posted):
+    """Test that PUT throws an error when given bad data."""
+    update_resp = requests.put(
+        TEST_RECORD_PATH,
+        json={'badcolname': 'badval'},
+    )
+    assert update_resp.status_code == 400
+
+
+@pytest.mark.parametrize('method', ('POST', 'PUT', 'DELETE'))
+def test_bad_no_rows(method, table_name):
+    """Test post, put and delete respond 400 when 'rows' not given in JSON."""
+    method_func = getattr(requests, method.lower())
+    path = '/'.join((API_URL, table_name))
+    response = method_func(path)
+    assert response.status_code == 400

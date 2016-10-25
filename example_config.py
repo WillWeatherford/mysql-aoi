@@ -1,11 +1,11 @@
-"""Local config for MySQL connection."""
+"""Example local config for MySQL connection."""
 
 HOST = '00.00.00.00'
 USER = 'username'
 PASSWORD = 'password'
 DATABASE = 'dbname'
 
-DEFAULT_CONFIG = {
+CONNECT_PARAMS = {
     'host': HOST,
     'user': USER,
     'password': PASSWORD,

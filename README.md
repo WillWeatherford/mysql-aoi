@@ -12,9 +12,13 @@ From command line:
 ### Routes:
 Each route is accessible with different HTTP methods for different purposes.
 
-- *GET* `/api/<table_name>?col1=val1&col2=val2`
-  - Queries data from all records, filtered by column names/values provided
-    as HTTP request parameters. Returns all records if no parameters are given.
+- *GET* `/api/<table_name>`
+  - Queries data from all records.
+  - Takes parameters included as json:
+    - columns: a list of columns to include in returned data
+    - criteria: a JSON object of column/value pairs to match
+    - num_rows: the number of rows to return. Default=20, maximum=100
+  - Returns first records if no parameters are given.
   - Returns JSON data in format `{'rows': [obj1, obj2, ...]}`
 
 - *GET* `/api/<table_name>/<int>`
@@ -22,26 +26,29 @@ Each route is accessible with different HTTP methods for different purposes.
   - Returns JSON data in format `{'rows': [obj]}`
 
 - *POST* `/api/<table_name>`
-  - Creates new records. Data must be included in POST request as json in the
-    format `{'rows': [obj1, obj2, ...]}`
-  - Returns JSON data in format `{success: <int>}` where <int> is the number
-    of records successfully inserted.
+  - Creates new records.
+  - Data to insert must be included in POST request as json for a single record,
+    and the format `{'rows': [obj1, obj2, ...]}` for multiple records.
+  - Returns JSON data in format `{'success': <int>, 'errors': []}`
+    where <int> is the number of records successfully inserted.
 
 - *PUT* `/api/<table_name>`
   - Updates existing records. JSON data must be included in PUT request in the
     format `{'rows': [obj1, obj2, ...]}`
+  - Each row must include a primary key column and value.
   - Returns JSON data in format `{success: <int>}` where <int> is the number
     of records successfully updated.
 
-- *PUT* `/api/<table_name>/<int>?col1=val1&col2=val2`
-  - Updates existing record with primary key of the given int, with column
-    names and values provided as HTTP request parameters.
+- *PUT* `/api/<table_name>/<int>`
+  - Updates existing record with primary key of the given int.
+  - Data to update must be included in POST request as json
   - Returns JSON data in format `{success: <int>}` where <int> is the number
     of records successfully updated.
 
 - *DELETE* `/api/<table_name>`
   - Deletes existing records. JSON data must be included in DELETE request in the
-    format `{'rows': [obj1, obj2, ...]}`
+    format `{'rows': [obj1, obj2, ...]}`.
+  - Each row must include a primary key column and value.
   - Returns JSON data in format `{success: <int>}` where <int> is the number
     of records successfully deleted.
 
