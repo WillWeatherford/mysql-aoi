@@ -1,4 +1,4 @@
-"""Local config for MySQL connection."""
+"""Example local config for MySQL connection."""
 
 HOST = '00.00.00.00'
 USER = 'username'
