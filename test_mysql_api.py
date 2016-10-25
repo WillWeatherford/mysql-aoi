@@ -55,29 +55,6 @@ def create_tables(request):
     request.addfinalizer(teardown)
 
 
-# def test_get_all(create_tables, app):
-#     """Test that a get request successfully gets stuff."""
-#     url = '/'.join((API_URL, 'company'))
-#     response = app.get(url)
-#     import pdb;pdb.set_trace()
-#     assert 'rows' in response.json()
-
-
-# def test_post_one(create_tables, app):
-#     """Test that new data can be posted."""
-#     data = {'rows': [{
-#         'entity_id': 1,
-#         'weburl': 'www.site.com',
-#         'co_name': 'TestCo',
-#         'pbid': '1',
-#     }]}
-#     url = '/'.join((API_URL, 'company'))
-#     response = app.post(url, data=json.dumps(data))
-
-#     assert response.status_code == 200
-#     # assert response.json() == {'success': 1}
-
-
 # SYSTEM TESTS ON RUNNING SERVER
 
 
@@ -214,3 +191,16 @@ def test_many_posted_delete(many_posted):
     )
     assert delete_resp.status_code == 200
     assert delete_resp.json().get('success') == NUM_TEST_RECORDS
+
+
+###########################
+# Fail case tests
+
+@pytest.mark.parametrize('method', ('GET', 'PUT', 'DELETE'))
+def test_bad_pk_404(method):
+    """Test that a 404 response is returned when a bad PK path is given."""
+    pk = "definitelynotarealpk"
+    method_func = getattr(requests, method.lower())
+    path = '/'.join((API_URL, 'company', pk))
+    response = method_func(path, json={})
+    assert response.status_code == 404
