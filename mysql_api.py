@@ -85,7 +85,7 @@ def endpoint_multi(table_name):
         if request.method == 'GET':
             # Figure out how to pass in criteria... json? params?
             results = get_multi(cursor, table_name, **kwargs)
-        elif request.method == 'POST' and not request.json.get('rows'):
+        elif request.method == 'POST' and request.json and not request.json.get('rows'):
             results = post_put_delete(cursor, None, table_name, **kwargs)
         else:
             results = post_put_delete_multi(cursor, table_name, **kwargs)
@@ -185,7 +185,7 @@ def post_put_delete_multi(cursor, table_name, **kwargs):
     """Insert or update based on given specifications."""
     try:
         rows = request.json["rows"]
-    except (AttributeError, KeyError):
+    except (AttributeError, TypeError, KeyError):
         abort(400, (
             'POST, PUT or DELETE request to this route must include json data '
             'with {"rows": [record_obj, record_obj, ...]}'
