@@ -34,33 +34,21 @@ app = Flask(__name__)
 class Connect(object):
     """Context manager for MySQL database connections."""
 
-    def __init__(self, debug=False, **params):
+    def __init__(self, **params):
         """Initialize the connection."""
-        self.debug = debug
-        if self.debug:
-            print('Initializing Connect()')
         self.params = params
 
     def __enter__(self):
         """Set up the connection and return a cursor."""
-        if self.debug:
-            print('Begin connect __enter__')
         self.conn = connector.connect(**self.params)
         self.cursor = self.conn.cursor()
-        if self.debug:
-            print('Complete connect __enter__')
         return self.cursor
 
     def __exit__(self, *args):
         """Set up the connection."""
-        if self.debug:
-            print('Begin connect __exit__')
-            print('Error args: {}'.format(args))
         self.conn.commit()
         self.conn.close()
         self.cursor.close()
-        if self.debug:
-            print('Complete connect __exit__')
         return False
 
 
