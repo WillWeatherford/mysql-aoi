@@ -5,6 +5,7 @@ import json
 import pytest
 import requests
 import config_test
+from copy import deepcopy
 from mysql import connector
 
 API_URL = 'http://127.0.0.1:5000/api'
@@ -184,14 +185,17 @@ def test_many_posted_success(many_posted):
 #     assert get_resp.json() == record
 
 
-# def test_many_posted_update(many_posted):
-#     """Test that posting one to real DB gives success response."""
-#     update_resp = requests.put(
-#         TEST_RECORD_PATH,
-#         json={'weburl': 'www.better-test-company.biz'},
-#     )
-#     assert update_resp.status_code == 200
-#     assert update_resp.json().get('success') == 1
+def test_many_posted_update(many_posted):
+    """Test that posting one to real DB gives success response."""
+    records = deepcopy(TEST_RECORDS)
+    for record in records:
+        record['weburl'] = 'www.updated.com'
+    update_resp = requests.put(
+        '/'.join((API_URL, 'company')),
+        json={'rows': records},
+    )
+    assert update_resp.status_code == 200
+    assert update_resp.json().get('success') == NUM_TEST_RECORDS
 
 
 # def test_many_posted_delete(many_posted):
