@@ -129,8 +129,7 @@ def get(cursor, pk, table_name, columns=None, **kwargs):
     except StopIteration:
         abort(404, "Record with primary key {} not found.".format(pk))
     else:
-        column_names = cursor.column_names
-        return dict(zip(column_names, row))
+        return dict(zip(cursor.column_names, row))
 
 
 def post_put_delete(cursor, pk, table_name, **kwargs):
@@ -191,8 +190,7 @@ def get_multi(cursor, table_name, columns=None, **kwargs):
         # Return better error codes for specific errors
         abort(500, "Something went wrong with your query.")
 
-    column_names = cursor.column_names
-    return {'rows': [dict(zip(column_names, row)) for row in cursor]}
+    return {'rows': [dict(zip(cursor.column_names, row)) for row in cursor]}
 
 
 def post_put_delete_multi(cursor, table_name, **kwargs):
@@ -225,7 +223,11 @@ def post_put_delete_multi(cursor, table_name, **kwargs):
 
         if method in ('PUT', 'DELETE'):
             query_parts.append("WHERE {}=%s".format(pk_name))
-            params.append(row_dict[pk_name])
+            try:
+                params.append(row_dict[pk_name])
+            except KeyError:
+                errors.append(row_dict)
+                continue
 
         query_string = " ".join(query_parts)
         try:
