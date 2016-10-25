@@ -86,11 +86,14 @@ def test_get_one():
     assert resp.json().get('entity_id') == '1'
 
 
-def test_get_one_hundred():
+def test_get_many():
     """Test getting one record from the real database."""
-    resp = requests.get('/'.join((API_URL, 'company')), params={'num_rows': 100})
+    resp = requests.get(
+        '/'.join((API_URL, 'company')),
+        params={'num_rows': NUM_TEST_RECORDS}
+    )
     assert resp.status_code == 200
-    assert len(resp.json().get('rows')) == 100
+    assert len(resp.json().get('rows')) == NUM_TEST_RECORDS
 
 
 ################################

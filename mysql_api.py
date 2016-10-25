@@ -15,7 +15,8 @@ from collections import OrderedDict
 from importlib import import_module
 from flask import Flask, jsonify, request, abort
 
-DEFAULT_NUM_ROWS = 100
+DEFAULT_NUM_ROWS = 20
+MAX_NUM_ROWS = 100
 
 config_module = import_module(os.environ['MYSQL_CONFIG_MODULE'])
 COLS = config_module.COLS
@@ -63,15 +64,8 @@ class Connect(object):
         return False
 
 
-# def connect():
-#     """Return a new connection to the MySQL database."""
-#     try:
-#         conn = connector.connect(**config_module.CONNECT_PARAMS)
-#         cursor = conn.cursor()
-#         return conn, cursor
-#     except connector.Error as err:
-#         raise err
-
+##########################
+# Routes
 
 @app.route("/api/<table_name>/<int:pk>", methods=["GET", "PUT", "DELETE"])
 def endpoint(table_name, pk):
@@ -79,14 +73,14 @@ def endpoint(table_name, pk):
     if table_name not in config_module.VALID_TABLES:
         abort(404)
 
-    func = globals()[request.method.lower()]
     kwargs = request.args.to_dict()
 
-    # Need to look up PK name from SQL instead
-    pk_name = "entity_id" if table_name == "company" else "id"
-
     with Connect(**config_module.CONNECT_PARAMS) as cursor:
-        results = func(cursor, pk, pk_name, table_name, **kwargs)
+        if request.method == 'GET':
+            # Figure out how to pass in criteria... json? params?
+            results = get(cursor, pk, table_name, columns="*", **kwargs)
+        else:
+            results = post_put_delete(cursor, pk, table_name, **kwargs)
         if not cursor.rowcount:
             abort(404, "{} not found by primary key {}".format(table_name, pk))
         return jsonify(**results)
@@ -102,21 +96,27 @@ def endpoint_multi(table_name):
     with Connect(**config_module.CONNECT_PARAMS) as cursor:
         if request.method == 'GET':
             # Figure out how to pass in criteria... json? params?
-            results = get_multiple(cursor, table_name, **kwargs)
+            results = get_multi(cursor, table_name, **kwargs)
+        elif request.method == 'POST' and not request.json.get('rows'):
+            results = post_put_delete(cursor, None, table_name, **kwargs)
         else:
             results = post_put_delete_multi(cursor, table_name, **kwargs)
         return jsonify(**results)
 
 
-def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
+#####################
+# Single item methods
+
+def get(cursor, pk, table_name, columns="*", **kwargs):
     """Generate result from select call to MySQL database."""
+    pk_name = "entity_id" if table_name == "company" else "id"
     query_str = "SELECT * from {} WHERE {}=%s".format(table_name, pk_name)
 
     try:
         cursor.execute(query_str, (pk, ))
-    except Exception as e:
+    except Exception:
         # Return better error codes for specific errors
-        return {'error': ". ".join(str(arg) for arg in e.args)}
+        abort(500, "Something went wrong with your query.")
 
     try:
         row = next(cursor)
@@ -127,45 +127,52 @@ def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
         return dict(zip(column_names, row))
 
 
-def put(cursor, pk, pk_name, table_name, **kwargs):
-    """Update single record by PK."""
-    method = "UPDATE {}".format(table_name)
-    set_, params = set_from_data(request.json)
-    where = "WHERE {}=%s".format(pk_name)
+def post_put_delete(cursor, pk, table_name, **kwargs):
+    """Create, update or delete a record."""
+    pk_name = "entity_id" if table_name == "company" else "id"
+    method = request.method
+    method_str = METHODS[method].format(table_name)
+    query_parts = [method_str]
+    params = []
 
-    query_str = " ".join((method, set_, where))
-    params.append(pk)
+    if method in ('PUT', 'POST'):
+        set_, values = set_from_data(request.json)
+        query_parts.append(set_)
+        params.extend(values)
+
+    if method in ('PUT', 'DELETE'):
+        query_parts.append("WHERE {}=%s".format(pk_name))
+        params.append(pk)
+
+    query_str = " ".join(query_parts)
 
     try:
         cursor.execute(query_str, params)
-    except Exception as e:
+    except Exception:
         # Return better error codes for specific errors
-        return {'error': ". ".join(str(arg) for arg in e.args)}
+        abort(500, "Something went wrong with your query.")
     else:
         return {'success': 1}
 
 
-def delete(cursor, pk, pk_name, table_name, **kwargs):
-    """Delete single record by PK."""
-    method = "DELETE FROM {}".format(table_name)
-    where = "WHERE {}=%s".format(pk_name)
-    query_str = " ".join((method, where))
-    params = [pk]
+##############################
+# Multiple item methods
 
-    try:
-        cursor.execute(query_str, params)
-    except Exception as e:
-        # Return better error codes for specific errors
-        return {'error': ". ".join(str(arg) for arg in e.args)}
-    else:
-        return {'success': 1}
-
-
-# Methods for multiple records
-
-
-def get_multiple(cursor, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
+def get_multi(cursor, table_name, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
+    if num_rows > MAX_NUM_ROWS:
+        abort(400, "Maximum num_rows in GET request: {}".format(MAX_NUM_ROWS))
+    params = [int(num_rows)]
+    query_str = "SELECT * FROM {} LIMIT %s;".format(table_name)
+
+    try:
+        cursor.execute(query_str, params)
+    except Exception:
+        # Return better error codes for specific errors
+        abort(500, "Something went wrong with your query.")
+
+    column_names = cursor.column_names
+    return {'rows': [dict(zip(column_names, row)) for row in cursor]}
 
 
 def post_put_delete_multi(cursor, table_name, **kwargs):
@@ -181,6 +188,9 @@ def post_put_delete_multi(cursor, table_name, **kwargs):
     pk_name = "entity_id" if table_name == "company" else "id"
     method = request.method
     method_str = METHODS[method].format(table_name)
+
+    if len(rows) > MAX_NUM_ROWS:
+        abort(400, "Maximum rows in {} request: {}".format(method, MAX_NUM_ROWS))
 
     success_count = 0
     errors = []
@@ -200,8 +210,8 @@ def post_put_delete_multi(cursor, table_name, **kwargs):
         query_string = " ".join(query_parts)
         try:
             cursor.execute(query_string, params)
-        except Exception as e:
-            errors.append(". ".join(str(arg) for arg in e.args))
+        except Exception:
+            errors.append(row_dict)
         else:
             success_count += 1
     return {'success': success_count, 'errors': errors}
