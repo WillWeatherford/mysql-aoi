@@ -78,7 +78,7 @@ def endpoint(table_name, pk):
     with Connect(**config_module.CONNECT_PARAMS) as cursor:
         if request.method == 'GET':
             # Figure out how to pass in criteria... json? params?
-            results = get(cursor, pk, table_name, columns="*", **kwargs)
+            results = get(cursor, pk, table_name, **kwargs)
         else:
             results = post_put_delete(cursor, pk, table_name, **kwargs)
         if not cursor.rowcount:
@@ -107,11 +107,17 @@ def endpoint_multi(table_name):
 #####################
 # Single item methods
 
-def get(cursor, pk, table_name, columns="*", **kwargs):
+def get(cursor, pk, table_name, columns=None, **kwargs):
     """Generate result from select call to MySQL database."""
     pk_name = "entity_id" if table_name == "company" else "id"
-    query_str = "SELECT * from {} WHERE {}=%s".format(table_name, pk_name)
+    if columns:
+        columns_str = make_columns_str(columns)
+    else:
+        columns_str = "*"
 
+    query_str = "SELECT {} from {} WHERE {}=%s".format(
+        columns_str, table_name, pk_name
+    )
     try:
         cursor.execute(query_str, (pk, ))
     except Exception:
@@ -123,8 +129,7 @@ def get(cursor, pk, table_name, columns="*", **kwargs):
     except StopIteration:
         abort(404, "Record with primary key {} not found.".format(pk))
     else:
-        column_names = cursor.column_names
-        return dict(zip(column_names, row))
+        return dict(zip(cursor.column_names, row))
 
 
 def post_put_delete(cursor, pk, table_name, **kwargs):
@@ -158,12 +163,26 @@ def post_put_delete(cursor, pk, table_name, **kwargs):
 ##############################
 # Multiple item methods
 
-def get_multi(cursor, table_name, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwargs):
+def get_multi(cursor, table_name, columns=None, **kwargs):
     """Return multiple rows of data, matching specified criteria."""
+    data = request.json or {}
+
+    num_rows = int(data.get('num_rows', DEFAULT_NUM_ROWS))
     if num_rows > MAX_NUM_ROWS:
         abort(400, "Maximum num_rows in GET request: {}".format(MAX_NUM_ROWS))
-    params = [int(num_rows)]
-    query_str = "SELECT * FROM {} LIMIT %s;".format(table_name)
+
+    params = []
+    columns_str = make_columns_str(data.get('columns'))
+    query_str = "SELECT {} FROM {}".format(columns_str, table_name)
+
+    criteria = data.get('criteria')
+    if criteria:
+        criteria_str, values = make_criteria_str(criteria)
+        query_str = " ".join((query_str, criteria_str))
+        params.extend(values)
+
+    query_str += " LIMIT %s"
+    params.append(num_rows)
 
     try:
         cursor.execute(query_str, params)
@@ -171,8 +190,7 @@ def get_multi(cursor, table_name, columns="*", num_rows=DEFAULT_NUM_ROWS, **kwar
         # Return better error codes for specific errors
         abort(500, "Something went wrong with your query.")
 
-    column_names = cursor.column_names
-    return {'rows': [dict(zip(column_names, row)) for row in cursor]}
+    return {'rows': [dict(zip(cursor.column_names, row)) for row in cursor]}
 
 
 def post_put_delete_multi(cursor, table_name, **kwargs):
@@ -205,7 +223,11 @@ def post_put_delete_multi(cursor, table_name, **kwargs):
 
         if method in ('PUT', 'DELETE'):
             query_parts.append("WHERE {}=%s".format(pk_name))
-            params.append(row_dict[pk_name])
+            try:
+                params.append(row_dict[pk_name])
+            except KeyError:
+                errors.append(row_dict)
+                continue
 
         query_string = " ".join(query_parts)
         try:
@@ -232,3 +254,30 @@ def set_from_data(data):
             abort(400, "Bad column name: {}".format(key))
 
     return "SET " + ", ".join(pairs), list(data.values())
+
+
+def make_columns_str(columns):
+    """Make a column string to be included in a SELECT query."""
+    if not columns:
+        return "*"
+    invalid = set(COLS) - set(columns)
+    if invalid:
+        abort(400, "Invalid column names. {}".format(', '.join(invalid)))
+    return ", ".join(columns)
+
+
+def make_criteria_str(criteria):
+    """Make a filters for WHERE query."""
+    try:
+        data = OrderedDict(criteria)
+    except TypeError:
+        abort(400, "Badly formatted criteria.")
+
+    pairs = []
+    for key in data.keys():
+        try:
+            pairs.append("{}=%s".format(COLS[key]))
+        except KeyError:
+            abort(400, "Bad column name in criteria: {}".format(key))
+
+    return "WHERE " + " AND ".join(pairs), list(data.values())

@@ -7,6 +7,7 @@ import requests
 import config_test
 from copy import deepcopy
 from mysql import connector
+from operator import itemgetter
 
 API_URL = 'http://127.0.0.1:5000/api'
 
@@ -26,6 +27,7 @@ for n in range(NUM_TEST_RECORDS):
     record = TEST_RECORD.copy()
     for key, val in record.items():
         record[key] = val + str(n)
+    record['weburl'] = 'www.filterbythisurl.com'
     TEST_RECORDS.append(record)
 
 
@@ -90,7 +92,7 @@ def test_get_many():
     """Test getting one record from the real database."""
     resp = requests.get(
         '/'.join((API_URL, 'company')),
-        params={'num_rows': NUM_TEST_RECORDS}
+        json={'num_rows': NUM_TEST_RECORDS}
     )
     assert resp.status_code == 200
     assert len(resp.json().get('rows')) == NUM_TEST_RECORDS
@@ -179,13 +181,16 @@ def test_many_posted_success(many_posted):
     assert many_posted.json().get('success') == NUM_TEST_RECORDS
 
 
-# @pytest.paramatrize('record', TEST_RECORDS)
-# def test_many_posted_get(record, many_posted):
-#     """Test that posting one to real DB gives success response."""
-#     path = '/'.join((API_URL, 'company', record['entity_id']))
-#     get_resp = requests.get(path)
-#     assert get_resp.status_code == 200
-#     assert get_resp.json() == record
+def test_many_posted_get(many_posted):
+    """Test that posting one to real DB gives success response."""
+    path = '/'.join((API_URL, 'company'))
+    criteria = {'weburl': 'www.filterbythisurl.com'}
+    get_resp = requests.get(path, json={'criteria': criteria})
+    assert get_resp.status_code == 200
+
+    results = get_resp.json()['rows']
+    key = itemgetter('entity_id')
+    assert sorted(results, key=key) == sorted(TEST_RECORDS, key=key)
 
 
 def test_many_posted_update(many_posted):
