@@ -5,7 +5,7 @@ USER = 'username'
 PASSWORD = 'password'
 DATABASE = 'dbname'
 
-DEFAULT_CONFIG = {
+CONNECT_PARAMS = {
     'host': HOST,
     'user': USER,
     'password': PASSWORD,
