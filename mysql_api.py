@@ -69,7 +69,6 @@ def endpoint(table_name, pk):
     if table_name not in config_module.VALID_TABLES:
         abort(404)
 
-    func = globals()[request.method.lower()]
     kwargs = request.args.to_dict()
 
     # Need to look up PK name from SQL instead
@@ -138,39 +137,6 @@ def post_put_delete(cursor, pk, pk_name, table_name, **kwargs):
         params.append(pk)
 
     query_str = " ".join(query_parts)
-
-    try:
-        cursor.execute(query_str, params)
-    except Exception as e:
-        # Return better error codes for specific errors
-        return {'errors': ". ".join(str(arg) for arg in e.args)}
-    else:
-        return {'success': 1}
-
-
-def put(cursor, pk, pk_name, table_name, **kwargs):
-    """Update single record by PK."""
-    method = "UPDATE {}".format(table_name)
-    set_, params = set_from_data(request.json)
-    where = "WHERE {}=%s".format(pk_name)
-    query_str = " ".join((method, set_, where))
-    params.append(pk)
-
-    try:
-        cursor.execute(query_str, params)
-    except Exception as e:
-        # Return better error codes for specific errors
-        return {'errors': ". ".join(str(arg) for arg in e.args)}
-    else:
-        return {'success': 1}
-
-
-def delete(cursor, pk, pk_name, table_name, **kwargs):
-    """Delete single record by PK."""
-    method = "DELETE FROM {}".format(table_name)
-    where = "WHERE {}=%s".format(pk_name)
-    query_str = " ".join((method, where))
-    params = [pk]
 
     try:
         cursor.execute(query_str, params)
