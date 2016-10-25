@@ -76,7 +76,11 @@ def endpoint(table_name, pk):
     pk_name = "entity_id" if table_name == "company" else "id"
 
     with Connect(**config_module.CONNECT_PARAMS) as cursor:
-        results = func(cursor, pk, pk_name, table_name, **kwargs)
+        if request.method == 'GET':
+            # Figure out how to pass in criteria... json? params?
+            results = get(cursor, pk, pk_name, table_name, columns="*", **kwargs)
+        else:
+            results = post_put_delete(cursor, pk, pk_name, table_name, columns="*", **kwargs)
         if not cursor.rowcount:
             abort(404, "{} not found by primary key {}".format(table_name, pk))
         return jsonify(**results)
@@ -117,9 +121,31 @@ def get(cursor, pk, pk_name, table_name, columns="*", **kwargs):
         return dict(zip(column_names, row))
 
 
-def post_put_delete():
+def post_put_delete(cursor, pk, pk_name, table_name, **kwargs):
     """Create, update or delete a record."""
-    pass
+    method = request.method
+    method_str = METHODS[method].format(table_name)
+    query_parts = [method_str]
+    params = []
+
+    if method in ('PUT', 'POST'):
+        set_, values = set_from_data(request.json)
+        query_parts.append(set_)
+        params.extend(values)
+
+    if method in ('PUT', 'DELETE'):
+        query_parts.append("WHERE {}=%s".format(pk_name))
+        params.append(pk)
+
+    query_str = " ".join(query_parts)
+
+    try:
+        cursor.execute(query_str, params)
+    except Exception as e:
+        # Return better error codes for specific errors
+        return {'errors': ". ".join(str(arg) for arg in e.args)}
+    else:
+        return {'success': 1}
 
 
 def put(cursor, pk, pk_name, table_name, **kwargs):
@@ -127,7 +153,6 @@ def put(cursor, pk, pk_name, table_name, **kwargs):
     method = "UPDATE {}".format(table_name)
     set_, params = set_from_data(request.json)
     where = "WHERE {}=%s".format(pk_name)
-
     query_str = " ".join((method, set_, where))
     params.append(pk)
 
