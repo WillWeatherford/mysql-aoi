@@ -93,6 +93,8 @@ def endpoint_multi(table_name):
         if request.method == 'GET':
             # Figure out how to pass in criteria... json? params?
             results = get_multi(cursor, table_name, **kwargs)
+        elif request.method == 'POST' and not request.json.get('rows'):
+            results = post_put_delete(cursor, None, table_name, **kwargs)
         else:
             results = post_put_delete_multi(cursor, table_name, **kwargs)
         return jsonify(**results)
