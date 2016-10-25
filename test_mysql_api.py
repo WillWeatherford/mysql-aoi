@@ -198,8 +198,11 @@ def test_many_posted_update(many_posted):
     assert update_resp.json().get('success') == NUM_TEST_RECORDS
 
 
-# def test_many_posted_delete(many_posted):
-#     """Test that posting one to real DB gives success response."""
-#     delete_resp = requests.delete(TEST_RECORD_PATH)
-#     assert delete_resp.status_code == 200
-#     assert delete_resp.json().get('success') == 1
+def test_many_posted_delete(many_posted):
+    """Test that posting one to real DB gives success response."""
+    delete_resp = requests.delete(
+        '/'.join((API_URL, 'company')),
+        json={'rows': TEST_RECORDS}
+    )
+    assert delete_resp.status_code == 200
+    assert delete_resp.json().get('success') == NUM_TEST_RECORDS
